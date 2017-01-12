@@ -21,6 +21,8 @@ data_applicants <- raw_applicants %>%
     mutate(mhtmc_rec = `custom_field_mh-tmc_rec` == "Yes") %>%
     select(-starts_with("custom_field"), -starts_with("pharmacy_school"))
 
+write_rds(data_applicants, "data/tidy/data_applicants.Rds", "gz")
+
 data_schools <- raw_applicants %>%
     select(cas_id, starts_with("pharmacy_school"), contains("school_score")) %>%
     mutate(school = if_else(pharmacy_school_name_0 == "NON-US/CANADIAN (FOREIGN) INSTITUTION",
@@ -32,9 +34,7 @@ data_schools <- raw_applicants %>%
     select(-starts_with("pharmacy_school")) %>%
     rename(school_score = custom_field_school_score)
 
-data_applicants <- left_join(data_applicants, data_schools, by = "cas_id")
-
-write_rds(data_applicants, "data/tidy/data_applicants.Rds", "gz")
+write_rds(data_schools, "data/tidy/data_schools.Rds", "gz")
 
 # areas of interests -----------------------------------
 data_interests <- raw_applicants %>%
@@ -259,7 +259,8 @@ data_vidyo <- data_vidyo %>%
 write_rds(data_vidyo, "data/tidy/data_vidyo.Rds", "gz")
 
 # application summary ----------------------------------
-results_application <- select(data_applicants, cas_id:last_name, school_score:grad_date) %>%
+results_application <- select(data_applicants, cas_id:last_name, mhtmc_rec) %>%
+    left_join(data_schools, by = "cas_id") %>%
     left_join(data_interests, by = "cas_id") %>%
     left_join(data_scores_total, by = "cas_id") %>%
     left_join(data_cv, by = "cas_id") %>%
