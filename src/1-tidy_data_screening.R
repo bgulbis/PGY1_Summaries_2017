@@ -22,14 +22,15 @@ data_applicants <- raw_applicants %>%
     select(-starts_with("custom_field"), -starts_with("pharmacy_school"))
 
 data_schools <- raw_applicants %>%
-    select(cas_id, starts_with("pharmacy_school")) %>%
+    select(cas_id, starts_with("pharmacy_school"), contains("school_score")) %>%
     mutate(school = if_else(pharmacy_school_name_0 == "NON-US/CANADIAN (FOREIGN) INSTITUTION",
                             pharmacy_school_name_1, pharmacy_school_name_0),
            gpa = if_else(pharmacy_school_name_0 == "NON-US/CANADIAN (FOREIGN) INSTITUTION",
                          pharmacy_school_gpa_1, pharmacy_school_gpa_0),
            grad_date = if_else(pharmacy_school_name_0 == "NON-US/CANADIAN (FOREIGN) INSTITUTION",
                                pharmacy_school_graduation_date_1, pharmacy_school_graduation_date_0)) %>%
-    select(-starts_with("pharmacy_school"))
+    select(-starts_with("pharmacy_school")) %>%
+    rename(school_score = custom_field_school_score)
 
 data_applicants <- left_join(data_applicants, data_schools, by = "cas_id")
 
@@ -39,7 +40,8 @@ write_rds(data_applicants, "data/tidy/data_applicants.Rds", "gz")
 data_interests <- raw_applicants %>%
     select(cas_id, starts_with("custom_field_interest")) %>%
     gather(interest_num, interest, starts_with("custom_field_interest"), na.rm = TRUE) %>%
-    mutate(interest_num = as.numeric(str_extract(interest_num, "[0-9]")))
+    dmap_at("interest_num", str_replace_all, pattern = "custom_field_", replacement = "") %>%
+    spread(interest_num, interest)
 
 write_rds(data_interests, "data/tidy/data_interests.Rds", "gz")
 
@@ -174,15 +176,11 @@ names(data_cv) <- str_replace_all(names(data_cv), cv_names)
 write_rds(data_cv, "data/tidy/data_cv.Rds", "gz")
 
 # application scores -----------------------------------
-data_scores <- raw_scores %>%
-    dmap_if(is.character, str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
-    dmap_if(is.character, str_trim, side = "both") %>%
-    dmap_if(is.character, str_replace_all, pattern = "Application Scoring: | - Poor Fit", "") %>%
-    dmap_at(c("assignments_application_scoring_remark_0", "assignments_application_scoring_remark_1"), as.numeric)
+tmp_remarks <- c("assignments_application_scoring_remark_0", "assignments_application_scoring_remark_1")
 
-scores_names <- c("assignments_application_scoring_question_" = "",
-                  "_(.?[0-9])_to_[0-9]" = "",
-                  "assignment(s)?_application_scoring" = "application",
+scores_names <- c("application_scoring_question_|any_scores_of_|_for_preceptors|_as_a_licensed" = "",
+                  "_(.?[0-9]*)_to_[0-9]|_(-1)" = "",
+                  "application_scoring" = "application",
                   "contributions_(.*)_patients" = "contributions",
                   "expecting_(.*)_residency" = "expectations",
                   "motivation_(.*)_residency" = "motivation",
@@ -196,6 +194,88 @@ scores_names <- c("assignments_application_scoring_question_" = "",
                   "leadership_experience" = "leadership",
                   "long(.*)_goals" = "goals")
 
-names(data_scores) <- str_replace_all(names(data_scores), scores_names)
+tmp_scores_num <- raw_scores %>%
+    select(cas_id, matches("assignments_(.*)_score_[0-1]$")) %>%
+    gather(review_num, score, starts_with("assignments_"), na.rm = TRUE) %>%
+    extract(review_num, c("item", "review_num"), "assignments_(.*)_score_([0-1])$") %>%
+    dmap_at("item", str_replace_all, pattern = scores_names) %>%
+    dmap_at("review_num", as.numeric) %>%
+    spread(item, score)
+
+tmp_scores_comment <- raw_scores %>%
+    select(cas_id, matches("assignments_(.*)_comments_[0-1]$")) %>%
+    gather(review_num, notes, starts_with("assignments_"), na.rm = TRUE) %>%
+    extract(review_num, c("item", "review_num"), "assignments_(.*)_comments_([0-1])$") %>%
+    dmap_at("item", str_replace_all, pattern = scores_names) %>%
+    dmap_at("item", ~ paste0(.x, "_comments")) %>%
+    dmap_at("review_num", as.numeric) %>%
+    spread(item, notes)
+
+data_scores <- raw_scores %>%
+    select(cas_id, contains("reviewer"), contains("remark")) %>%
+    gather(review_num, value, starts_with("assignment"), na.rm = TRUE) %>%
+    dmap_at("review_num", str_replace_all, pattern = "assignments", replacement = "assignment") %>%
+    extract(review_num, c("item", "review_num"), "(reviewer|remark)_([0-1])$") %>%
+    spread(item, value) %>%
+    dmap_at("remark", str_extract, pattern = "[0-9]") %>%
+    dmap_at(c("review_num", "remark"), as.numeric) %>%
+    left_join(tmp_scores_num, by = c("cas_id", "review_num")) %>%
+    left_join(tmp_scores_comment, by = c("cas_id", "review_num")) %>%
+    rename(remark_application = remark,
+           score_application = application)
 
 write_rds(data_scores, "data/tidy/data_scores.Rds", "gz")
+
+data_scores_total <- data_scores %>%
+    mutate(review_group = if_else(reviewer == "Gulbis, Brian" | reviewer == "Schepcoff, Sara", 1, 2)) %>%
+    select_if(is.numeric) %>%
+    group_by(cas_id, review_group) %>%
+    summarize_all(mean, na.rm = TRUE) %>%
+    select(-review_num)
+
+write_rds(data_scores_total, "data/tidy/data_scores_total.Rds", "gz")
+
+# vidyo interviews -------------------------------------
+data_vidyo <- raw_vidyo %>%
+    select(-designation_program_lookup_id) %>%
+    dmap_if(is.character, str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
+    dmap_if(is.character, str_trim, side = "both") %>%
+    dmap_at("interview_vidyo_interview_remarks", str_extract, pattern = "[0-9]") %>%
+    dmap_at("interview_vidyo_interview_remarks", as.numeric)
+
+vidyo_names <- c("interview(s)?_vidyo_interview_(question_)?" = "",
+                 "critical_(.*)_task" = "crit_think",
+                 "time_(.*)_assignments" = "time_mgmt",
+                 "self(.*)_obstacle" = "prob_solve",
+                 "integrity_(.*)_harmed" = "integrity")
+
+names(data_vidyo) <- str_replace_all(names(data_vidyo), vidyo_names)
+
+data_vidyo <- data_vidyo %>%
+    rename(remark_vidyo = remarks,
+           score_vidyo = score,
+           comments_vidyo = comments)
+
+write_rds(data_vidyo, "data/tidy/data_vidyo.Rds", "gz")
+
+# application summary ----------------------------------
+results_application <- select(data_applicants, cas_id:last_name, school_score:grad_date) %>%
+    left_join(data_interests, by = "cas_id") %>%
+    left_join(data_scores_total, by = "cas_id") %>%
+    left_join(data_cv, by = "cas_id") %>%
+    left_join(select_if(data_vidyo, is.numeric), by = "cas_id") %>%
+    group_by(cas_id) %>%
+    mutate(overall.score = sum(school_score, score_application, score_vidyo, na.rm = TRUE),
+           avg.fit = mean(c(remark_application, remark_vidyo), na.rm = TRUE),
+           low.fit = remark_application < 3 | remark_vidyo < 3,
+           low.school = school_score < 2) %>%
+    ungroup %>%
+    arrange(desc(overall.score), desc(avg.fit)) %>%
+    select(cas_id, last_name, first_name, school, overall.score, avg.fit, low.fit, low.school, everything())
+
+write_csv(results_application, "data/final/application_scoring.csv")
+
+results_application_summary <- results_application %>%
+    select(last_name:review_group)
+
+write_csv(results_application_summary, "data/final/application_scoring_summary.csv")
