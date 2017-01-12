@@ -134,7 +134,7 @@ data_program_comments <- raw_references %>%
 
 write_rds(data_program_comments, "data/tidy/data_program_comments.Rds", "gz")
 
-# data extraction --------------------------------------
+# LOI extraction --------------------------------------
 
 question_names <- c("(.*)other_findings_in_cv(.*)" = "other_cv",
                     "(.*)other_statements(.*)" = "other_letter",
@@ -155,4 +155,19 @@ data_intent <- raw_extracts %>%
     dmap_at("response", str_replace_all, pattern = "â\u0080\u0093", replacement = "-") %>%
     spread(question, response)
 
-write_rds(data_intent, "data/tidy_data_intent.Rds", "gz")
+write_rds(data_intent, "data/tidy/data_intent.Rds", "gz")
+
+# CV extraction ----------------------------------------
+
+data_cv <- raw_extracts %>%
+    select(cas_id, contains("score"))
+
+names(data_cv) <- str_replace_all(names(data_cv), "assignments_data_extraction_question_number_of_", "")
+names(data_cv) <- str_replace_all(names(data_cv), "_score", "")
+names(data_cv) <- str_replace_all(names(data_cv), "rotations_(.*)_centers", "academic_rotations")
+names(data_cv) <- str_replace_all(names(data_cv), "assignments_(.*)_rotations", "num_rotations")
+names(data_cv) <- str_replace_all(names(data_cv), "peer(.*)_publications", "publications")
+names(data_cv) <- str_replace_all(names(data_cv), "state_national_", "")
+
+write_rds(data_cv, "data/tidy/data_cv.Rds", "gz")
+
