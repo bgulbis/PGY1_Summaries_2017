@@ -131,3 +131,28 @@ data_program_comments <- raw_references %>%
     dmap_at("quality", str_replace, pattern = "_rating", replacement = "") %>%
     dmap_at("comment", str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
     dmap_at("comment", str_trim, side = "both")
+
+write_rds(data_program_comments, "data/tidy/data_program_comments.Rds", "gz")
+
+# data extraction --------------------------------------
+
+question_names <- c("(.*)other_findings_in_cv(.*)" = "other_cv",
+                    "(.*)other_statements(.*)" = "other_letter",
+                    "(.*)what_are_your_goals(.*)" = "goals",
+                    "(.*)what_can_you_bring(.*)" = "contributions",
+                    "(.*)why_do_you_want(.*)" = "motivation",
+                    "(.*)what_are_you_expecting(.*)" = "expectations",
+                    "(.*)extraction_comments(.*)" = "reviewer_comments")
+
+data_intent <- raw_extracts %>%
+    select(cas_id, contains("comments")) %>%
+    mutate_each(funs(as.character(.)), contains("comments")) %>%
+    gather(question, response, contains("comments"), na.rm = TRUE) %>%
+    dmap_at("question", str_replace_all, pattern = question_names) %>%
+    dmap_at("response", str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
+    dmap_at("response", str_trim, side = "both") %>%
+    dmap_at("response", str_replace_all, pattern = "â\u0080\u0099", replacement = "'") %>%
+    dmap_at("response", str_replace_all, pattern = "â\u0080\u0093", replacement = "-") %>%
+    spread(question, response)
+
+write_rds(data_intent, "data/tidy_data_intent.Rds", "gz")
