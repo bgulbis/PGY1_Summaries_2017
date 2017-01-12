@@ -16,6 +16,7 @@ interest_areas <- c("Not Specified", "Ambulatory Care", "Cardiology",
                     "Management", "Oncology", "Pediatrics", "Psychiatry",
                     "Transplant", "Other")
 
+# applicant info ---------------------------------------
 data_applicants <- raw_applicants %>%
     mutate(mhtmc_rec = `custom_field_mh-tmc_rec` == "Yes") %>%
     select(-starts_with("custom_field"), -starts_with("pharmacy_school"))
@@ -34,7 +35,15 @@ data_applicants <- left_join(data_applicants, data_schools, by = "cas_id")
 
 write_rds(data_applicants, "data/tidy/data_applicants.Rds", "gz")
 
-# determine how many references there were for each candidate, remove duplicates
+# areas of interests -----------------------------------
+data_interests <- raw_applicants %>%
+    select(cas_id, starts_with("custom_field_interest")) %>%
+    gather(interest_num, interest, starts_with("custom_field_interest"), na.rm = TRUE) %>%
+    mutate(interest_num = as.numeric(str_extract(interest_num, "[0-9]")))
+
+write_rds(data_interests, "data/tidy/data_interests.Rds", "gz")
+
+# reference names --------------------------------------
 data_references <- raw_references %>%
     select(cas_id:evaluator_id_for_references_4) %>%
     gather(ref_num, writer_id, evaluator_id_for_references_0:evaluator_id_for_references_4, na.rm = TRUE) %>%
