@@ -93,8 +93,41 @@ tmp_comments <- raw_references %>%
     dmap_at("comment", str_trim, side = "both")
 
 # combine rating and comments
+quality_names <- c("assertiveness" = "Assertive",
+                   "clinical_problem_solving_skills" = "Problem Solving",
+                   "constructive_criticism" = "Criticism",
+                   "dependability" = "Dependable",
+                   "emotional_maturity" = "Maturity",
+                   "independence" = "Independence",
+                   "leadership" = "Leadership",
+                   "oral_communication" = "Oral Comm",
+                   "overall_code" = "Overall",
+                   "patient_interactions" = "Patient Interact",
+                   "peer_communication" = "Peer Comm",
+                   "professionalism" = "Professional",
+                   "time_management" = "Time Management",
+                   "written_communication" = "Written Comm")
+
 data_qualities <- full_join(tmp_ratings, tmp_comments, by=c("cas_id", "quality", "ref_num")) %>%
-    arrange(cas_id, quality, ref_num)
+    arrange(cas_id, quality, ref_num) %>%
+    dmap_at("quality", str_replace_all, pattern = quality_names)
 
 write_rds(data_qualities, "data/tidy/data_qualities.Rds", "gz")
 
+# program comments -------------------------------
+
+# description, strengths, weakness, and other all contain no data
+
+data_program_comments <- raw_references %>%
+    select(cas_id,
+           contains("improvement_areas"),
+           contains("other_observances"),
+           contains("description"),
+           contains("reference_comments"),
+           contains("strength")) %>%
+    gather(ref_num, comment, starts_with("reference_"), na.rm = TRUE) %>%
+    extract(ref_num, c("quality", "ref_num"), "reference_(.*)_([0-4])$") %>%
+    dmap_at("ref_num", as.numeric) %>%
+    dmap_at("quality", str_replace, pattern = "_rating", replacement = "") %>%
+    dmap_at("comment", str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
+    dmap_at("comment", str_trim, side = "both")
