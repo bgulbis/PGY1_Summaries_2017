@@ -162,12 +162,40 @@ write_rds(data_intent, "data/tidy/data_intent.Rds", "gz")
 data_cv <- raw_extracts %>%
     select(cas_id, contains("score"))
 
-names(data_cv) <- str_replace_all(names(data_cv), "assignments_data_extraction_question_number_of_", "")
-names(data_cv) <- str_replace_all(names(data_cv), "_score", "")
-names(data_cv) <- str_replace_all(names(data_cv), "rotations_(.*)_centers", "academic_rotations")
-names(data_cv) <- str_replace_all(names(data_cv), "assignments_(.*)_rotations", "num_rotations")
-names(data_cv) <- str_replace_all(names(data_cv), "peer(.*)_publications", "publications")
-names(data_cv) <- str_replace_all(names(data_cv), "state_national_", "")
+cv_names <- c("assignments_data_extraction_question_number_of_" = "",
+              "_score" = "",
+              "rotations_(.*)_centers" = "academic_rotations",
+              "assignments_(.*)_rotations" = "num_rotations",
+              "peer(.*)_publications" = "publications",
+              "state_national_" = "")
+
+names(data_cv) <- str_replace_all(names(data_cv), cv_names)
 
 write_rds(data_cv, "data/tidy/data_cv.Rds", "gz")
 
+# application scores -----------------------------------
+data_scores <- raw_scores %>%
+    dmap_if(is.character, str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
+    dmap_if(is.character, str_trim, side = "both") %>%
+    dmap_if(is.character, str_replace_all, pattern = "Application Scoring: | - Poor Fit", "") %>%
+    dmap_at(c("assignments_application_scoring_remark_0", "assignments_application_scoring_remark_1"), as.numeric)
+
+scores_names <- c("assignments_application_scoring_question_" = "",
+                  "_(.?[0-9])_to_[0-9]" = "",
+                  "assignment(s)?_application_scoring" = "application",
+                  "contributions_(.*)_patients" = "contributions",
+                  "expecting_(.*)_residency" = "expectations",
+                  "motivation_(.*)_residency" = "motivation",
+                  "followed_(.*)_instructions" = "instructions",
+                  "any_spelling_(.*)_application" = "spelling",
+                  "other_(.*)_awarded" = "other",
+                  "recommender_(.*)_us" = "known_recommender",
+                  "review_(.*)_recommendations" = "recs",
+                  "clinical_(.*)_competition" = "clin_skills",
+                  "lcep(.*)_program" = "lcep",
+                  "leadership_experience" = "leadership",
+                  "long(.*)_goals" = "goals")
+
+names(data_scores) <- str_replace_all(names(data_scores), scores_names)
+
+write_rds(data_scores, "data/tidy/data_scores.Rds", "gz")
