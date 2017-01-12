@@ -70,3 +70,31 @@ tmp_ref_name <- inner_join(tmp_ref_name_first, tmp_ref_name_last, by = c("cas_id
 data_references <- inner_join(data_references, tmp_ref_name, by = c("cas_id", "ref_num"))
 
 write_rds(data_references, "data/tidy/data_references.Rds", "gz")
+
+# reference ratings ------------------------------------
+
+# gather the ratings into long data format
+tmp_ratings <- raw_references %>%
+    select(cas_id, matches("reference_(.*)_rating_[0-4]$")) %>%
+    gather(ref_num, rating, starts_with("reference_"), na.rm = TRUE) %>%
+    extract(ref_num, c("quality", "ref_num"), "reference_(.*)_rating_([0-4])$") %>%
+    dmap_at("ref_num", as.numeric)
+
+# reference comments -----------------------------------
+
+# gather the comments into long data format
+tmp_comments <- raw_references %>%
+    select(cas_id, matches("reference_(.*)_comments_[0-4]$")) %>%
+    gather(ref_num, comment, starts_with("reference_"), na.rm = TRUE) %>%
+    extract(ref_num, c("quality", "ref_num"), "reference_(.*)_comments_([0-4])$") %>%
+    dmap_at("ref_num", as.numeric) %>%
+    dmap_at("quality", str_replace, pattern = "_rating", replacement = "") %>%
+    dmap_at("comment", str_replace_all, pattern = "(\\n|\\t)", replacement = "") %>%
+    dmap_at("comment", str_trim, side = "both")
+
+# combine rating and comments
+data_qualities <- full_join(tmp_ratings, tmp_comments, by=c("cas_id", "quality", "ref_num")) %>%
+    arrange(cas_id, quality, ref_num)
+
+write_rds(data_qualities, "data/tidy/data_qualities.Rds", "gz")
+
