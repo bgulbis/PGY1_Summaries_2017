@@ -266,15 +266,18 @@ results_application <- select(data_applicants, cas_id:last_name, mhtmc_rec) %>%
     left_join(data_cv, by = "cas_id") %>%
     left_join(select_if(data_vidyo, is.numeric), by = "cas_id") %>%
     group_by(cas_id) %>%
-    mutate(overall.score = sum(school_score, score_application, score_vidyo, na.rm = TRUE),
-           avg.fit = mean(c(remark_application, remark_vidyo), na.rm = TRUE),
-           low.fit = remark_application < 3 | remark_vidyo < 3,
-           low.school = school_score < 2) %>%
+    mutate(score_overall = sum(school_score, score_application, score_vidyo, na.rm = TRUE),
+           fit_mean = mean(c(remark_application, remark_vidyo), na.rm = TRUE),
+           fit_low = remark_application < 3 | remark_vidyo < 3,
+           school_low = school_score < 2) %>%
     ungroup %>%
-    arrange(desc(overall.score), desc(avg.fit)) %>%
-    select(cas_id, last_name, first_name, school, overall.score, avg.fit, low.fit, low.school, everything())
+    arrange(desc(score_overall), desc(fit_mean)) %>%
+    select(cas_id, last_name, first_name, school, score_overall, fit_mean, fit_low, school_low, everything())
 
 write_csv(results_application, "data/final/application_scoring.csv")
+
+data_scores_overall <- select(results_application, cas_id, score_overall)
+write_rds(data_scores_overall, "data/tidy/data_scores_overall.Rds")
 
 results_application_summary <- results_application %>%
     select(last_name:review_group)
