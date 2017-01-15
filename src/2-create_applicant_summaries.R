@@ -291,8 +291,7 @@ for (i in 1:nrow(data_applicants)) {
         addParagraph(paste0("Application Comments: ", cv_notes$application_comments), stylename = "Normal") %>%
         addParagraph(paste0("Vidyo Comments: ", vidyo$comments_vidyo), stylename = "Normal")
 
-
-    file.name <- paste0("report/summaries/", applicant$last_name, "_", applicant$first_name, ".docx")
+    file.name <- paste0("report/summaries/", applicant$last_name, "_", applicant$first_name, "_", applicant$cas_id, ".docx")
     writeDoc(mydoc, file = file.name)
 
 }
