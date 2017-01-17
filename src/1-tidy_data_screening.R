@@ -275,6 +275,7 @@ results_application <- select(data_applicants, cas_id:last_name, mhtmc_rec) %>%
     select(cas_id, last_name, first_name, school, score_overall, fit_mean, fit_low, school_low, everything())
 
 write_csv(results_application, "data/final/application_scoring.csv")
+write_rds(results_application, "data/final/application_scoring.Rds")
 
 data_scores_overall <- select(results_application, cas_id, score_overall)
 write_rds(data_scores_overall, "data/tidy/data_scores_overall.Rds")
