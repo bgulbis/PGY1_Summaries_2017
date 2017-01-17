@@ -1,0 +1,19 @@
+---
+title: "Applicant Score Exploration"
+author: "Brian Gulbis"
+date: "January 17, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DT)
+
+scores <- read_rds("../data/final/application_scoring.Rds")
+```
+
+```{r}
+datatable(scores, filter = "top", options = list(pageLength = 30))
+```
+
